@@ -71,7 +71,7 @@ function writeField(target, obj, key, value) {
   }
 }
 function validateId(op) {
-  if (op.action === 'order') return op.target === 'event' && Number.isInteger(op.dayId) && op.dayId >= 1 && op.dayId <= 9;
+  if (op.action === 'order') return op.target === 'todo' || (op.target === 'event' && Number.isInteger(op.dayId) && op.dayId >= 1 && op.dayId <= 9);
   if (op.target === 'day') return Number.isInteger(op.dayId) && op.dayId >= 1 && op.dayId <= 9;
   if (op.target === 'event') return Number.isInteger(op.dayId) && op.dayId >= 1 && op.dayId <= 9 && typeof op.id === 'string' && op.id.length <= 80;
   if (op.target === 'booking' || op.target === 'todo') return typeof op.id === 'string' && op.id.length <= 80;
@@ -117,7 +117,12 @@ export function applyTripOps(source, ops) {
       if (idx >= 0 && !equal(list[idx], op.before)) conflicts.push(`${op.target}:${op.id} changed`);
       else if (idx >= 0) list.splice(idx, 1);
     } else if (op.action === 'order') {
-      if (op.target !== 'event' || !Array.isArray(op.ids) || !Array.isArray(op.beforeIds)) return {error:'Invalid order'};
+      if (!['event','todo'].includes(op.target) || !Array.isArray(op.ids) || !Array.isArray(op.beforeIds) ||
+          op.ids.length > 250 || op.beforeIds.length > 250 ||
+          op.ids.some(id => typeof id !== 'string' || id.length > 80) ||
+          op.beforeIds.some(id => typeof id !== 'string' || id.length > 80) ||
+          new Set(op.ids).size !== op.ids.length || new Set(op.beforeIds).size !== op.beforeIds.length)
+        return {error:'Invalid order'};
       const list = listFor(data, op);
       if (!list) return {error:'Invalid order target'};
       const actualBase = list.filter(x => op.beforeIds.includes(x.id)).map(x => x.id);
@@ -125,7 +130,7 @@ export function applyTripOps(source, ops) {
       const alreadyOrdered = op.ids.filter(id => list.some(x => x.id === id)).join('|') ===
         list.filter(x => op.ids.includes(x.id)).map(x => x.id).join('|');
       if (!equal(actualBase, expectedBase) && !alreadyOrdered) {
-        conflicts.push(`event order:${op.dayId}`);
+        conflicts.push(op.target === 'event' ? `event order:${op.dayId}` : 'todo order');
       } else {
         const orderMap = new Map(list.map(x => [x.id, x]));
         list.splice(0, list.length, ...op.ids.filter(id => orderMap.has(id)).map(id => orderMap.get(id)),
