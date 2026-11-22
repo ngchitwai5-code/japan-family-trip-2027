@@ -1,0 +1,9 @@
+{
+  "name": "japan-family-trip-2027-netlify",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "2027 family Tokyo Hakone Izu travel planner",
+  "engines": {"node": ">=20"},
+  "dependencies": {"@netlify/blobs": "^11.1.9"}
+}
