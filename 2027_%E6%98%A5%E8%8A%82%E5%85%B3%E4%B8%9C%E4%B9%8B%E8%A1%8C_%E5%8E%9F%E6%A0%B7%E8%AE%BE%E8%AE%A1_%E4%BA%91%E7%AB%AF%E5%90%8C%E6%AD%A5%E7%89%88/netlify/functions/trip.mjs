@@ -1,5 +1,4 @@
 import { getStore } from '@netlify/blobs';
-import { timingSafeEqual } from 'node:crypto';
 
 function json(value, status = 200) {
   return new Response(JSON.stringify(value), {
@@ -12,23 +11,11 @@ function json(value, status = 200) {
   });
 }
 
-function isAdmin(request) {
-  const expected = process.env.TRIP_ADMIN_PASSWORD || '';
-  const supplied = request.headers.get('x-admin-key') || '';
-  if (!expected || !supplied) return false;
-  const a = Buffer.from(expected, 'utf8');
-  const b = Buffer.from(supplied, 'utf8');
-  return a.length === b.length && timingSafeEqual(a, b);
-}
-
-// Netlify Blobs: site-wide store (persists through new deployments).
-// The admin password must be set in the Netlify UI, not in this source file.
+// Publicly editable family travel journal. The public URL is the write permission.
+// Do not store sensitive personal or booking information here.
 export default async function handler(request) {
   try {
     const method = request.method.toUpperCase();
-    if (method === 'POST') {
-      return isAdmin(request) ? json({ ok: true }) : json({ error: 'Unauthorized' }, 401);
-    }
     if (method !== 'GET' && method !== 'PUT') {
       return json({ error: 'Method not allowed' }, 405);
     }
@@ -37,7 +24,15 @@ export default async function handler(request) {
       const record = await store.get('itinerary', { type: 'json', consistency: 'strong' });
       return json({ data: record?.data || null, updatedAt: record?.updatedAt || null });
     }
-    if (!isAdmin(request)) return json({ error: 'Unauthorized' }, 401);
+    // Require the normal same-origin JSON request shape to reduce accidental cross-site writes.
+    // This is not authentication: anyone can intentionally call the public endpoint.
+    if (!(request.headers.get('content-type') || '').toLowerCase().includes('application/json')) {
+      return json({ error: 'JSON content type required' }, 415);
+    }
+    const origin = request.headers.get('origin');
+    if (origin && new URL(origin).host !== new URL(request.url).host) {
+      return json({ error: 'Cross-origin write not allowed' }, 403);
+    }
     const raw = await request.text();
     if (Buffer.byteLength(raw, 'utf8') > 200000) return json({ error: 'Payload too large' }, 413);
     let body;
