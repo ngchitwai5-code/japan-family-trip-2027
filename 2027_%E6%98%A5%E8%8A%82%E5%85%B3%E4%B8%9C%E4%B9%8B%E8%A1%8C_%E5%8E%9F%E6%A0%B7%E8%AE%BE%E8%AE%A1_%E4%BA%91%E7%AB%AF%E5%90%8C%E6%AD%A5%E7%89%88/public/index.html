@@ -109,6 +109,31 @@ button.event-bullet:focus-visible{outline:2px solid #2d7565;outline-offset:5px}
  .map-poi-top{flex-wrap:wrap}.event-controls{gap:3px}.sort-btn{min-width:27px}}
 @media(max-width:370px){.map-poi-grid{grid-template-columns:1fr}}
 
+
+/* Checklist V6: edit the item text, drag by handle (touch + mouse), or use arrow buttons. */
+.todo-list{display:grid;gap:9px}
+.todo-list .todo-item{display:flex;align-items:center;margin-bottom:0;gap:9px;min-height:58px;padding:11px 12px;transition:border-color .14s,box-shadow .14s,background .14s}
+.todo-list .todo-text{min-width:0;flex:1;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55}
+.todo-list .todo-item.done .todo-text{text-decoration:line-through;color:#a8b3ad}
+.todo-actions{align-items:center;gap:3px;flex-shrink:0;margin-left:auto}
+.todo-actions .todo-tool,.todo-actions .todo-grip{border:1px solid transparent;background:transparent;border-radius:8px;
+  min-width:28px;height:32px;display:inline-grid;place-items:center;padding:0 4px;color:#688c80;font-size:15px;line-height:1}
+.todo-actions .todo-tool:hover,.todo-actions .todo-grip:hover{background:#eef6f1;border-color:#dae7de;color:#246257}
+.todo-actions .todo-tool:focus-visible,.todo-actions .todo-grip:focus-visible{outline:2px solid #4b927d;outline-offset:2px}
+.todo-actions .todo-tool:disabled{opacity:.2;cursor:not-allowed}
+.todo-actions .todo-remove{font-size:19px;color:#abb9b1}
+.todo-actions .todo-grip{font-size:22px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.todo-actions .todo-grip:active{cursor:grabbing}
+.todo-drag-hint{font-size:11px;color:#94a39b;line-height:1.7;margin:0 0 12px}
+.todo-item.todo-drag-source{opacity:.38;background:#f4faf6}
+.todo-item.todo-drop-before{box-shadow:inset 0 3px 0 #5b9a85}
+.todo-item.todo-drop-after{box-shadow:inset 0 -3px 0 #5b9a85}
+.todo-drag-ghost{position:fixed;z-index:1250;pointer-events:none;opacity:.95;box-shadow:0 15px 34px rgba(29,70,59,.20);
+  border:1px solid #95c4aa!important;background:#f8fff9!important;transform:rotate(-1.3deg);margin:0!important;box-sizing:border-box}
+@media(max-width:740px){.todo-list .todo-item{gap:8px;padding:11px 10px}.todo-actions{gap:1px}
+ .todo-actions .todo-tool,.todo-actions .todo-grip{min-width:26px;height:30px;font-size:14px;padding:0 2px}
+ .todo-actions .todo-grip{font-size:20px}.todo-list .todo-text{font-size:12px}}
+@media(max-width:370px){.todo-actions .todo-tool,.todo-actions .todo-grip{min-width:24px}}
 </style>
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -331,6 +356,15 @@ function tripDiff(base,next){
   }
   ops.push(...diffRecords('booking',base.bookings,next.bookings));
   ops.push(...diffRecords('todo',base.todos,next.todos));
+  // Order is a separate operation so unrelated edits from family devices still merge.
+  // Newly added items are appended by the backend first; generate order when a new item
+  // is inserted anywhere else, too (not just when existing items swap positions).
+  const baseTodoIds=(base.todos||[]).map(t=>String(t.id));
+  const desiredTodoIds=(next.todos||[]).map(t=>String(t.id));
+  const desiredSet=new Set(desiredTodoIds),baseSet=new Set(baseTodoIds);
+  const orderAfterAdds=baseTodoIds.filter(id=>desiredSet.has(id)).concat(desiredTodoIds.filter(id=>!baseSet.has(id)));
+  if(!fieldEquals(orderAfterAdds,desiredTodoIds))ops.push({action:'order',target:'todo',
+    ids:desiredTodoIds,beforeIds:baseTodoIds});
   const oldMap=base.mapNotes||{},newMap=next.mapNotes||{};
   const mf=fieldDelta(oldMap,newMap,['intro']);
   for(let i=0;i<5;i++){
@@ -588,7 +622,119 @@ function initMap(){
     setTimeout(()=>{if(mapObject&&token===mapGeneration)mapObject.invalidateSize()},250);
   }catch(_){c.innerHTML='<div class="map-fallback"><div>地图暂时不可用，请用下方地点链接导航</div></div>';}
 }
-function todosHTML(){const done=data.todos.filter(t=>t.done).length;const pct=data.todos.length?Math.round(done/data.todos.length*100):100;return `<div class="panel todo-progress"><div class="progress-head"><strong>行前准备进度</strong><span>${done} / ${data.todos.length} 已完成 · ${pct}%</span></div><div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div><div class="micro">点击「自由编辑」即可勾选、增删事项；保存后全家都能看到更新。</div></div><div class="todo-group"><h3>✦ 全家出发前要做的事</h3>${data.todos.map(t=>`<label class="todo-item ${t.done?'done':''}"><input type="checkbox" class="todo-check" data-todo="${e(t.id)}" ${t.done?'checked':''} ${!edit?'disabled':''}><span>${e(t.text)}</span><button class="remove edit-only" type="button" data-action="remove-todo" data-id="${e(t.id)}" title="删除">×</button></label>`).join('')}<form id="todoForm" class="todo-add edit-only"><input name="todoText" maxlength="180" placeholder="新增待办事项，例如：预约除夕晚餐" required><button type="submit">＋ 添加</button></form></div><div class="backup-actions" aria-label="行程数据备份"><button type="button" class="small-btn" data-action="export">⬇ 导出行程备份</button><button type="button" class="small-btn" data-action="reload-cloud">↻ 重新加载云端</button><button type="button" class="small-btn edit-only" data-action="import">↥ 导入备份</button><input type="file" id="importFile" accept=".json,application/json" style="display:none"></div>`}
+function moveTodo(id,step){
+  const i=data.todos.findIndex(t=>String(t.id)===String(id)),to=i+step;
+  if(i<0||to<0||to>=data.todos.length)return false;
+  const [item]=data.todos.splice(i,1);data.todos.splice(to,0,item);return true;
+}
+function reorderTodo(dragId,targetId,after){
+  const from=data.todos.findIndex(t=>String(t.id)===String(dragId));
+  if(from<0||String(dragId)===String(targetId))return false;
+  const [item]=data.todos.splice(from,1);
+  const at=data.todos.findIndex(t=>String(t.id)===String(targetId));
+  if(at<0){data.todos.splice(from,0,item);return false;}
+  const dest=at+(after?1:0);
+  data.todos.splice(dest,0,item);
+  return from!==dest;
+}
+function todoEditForm(id){
+  const item=data.todos.find(t=>String(t.id)===String(id));
+  if(!item)return;
+  modal(`${modalHeader('修改出行清单')}<form id="todoEditForm" data-id="${e(item.id)}">${field('todoText','待办事项',item.text,'textarea','required maxlength="180"')}<div class="modal-actions"><button type="button" class="secondary" data-action="close">取消</button><button type="submit" class="primary">保存修改</button></div></form>`);
+  element('field-todoText')?.focus();
+}
+function todosHTML(){
+  const done=data.todos.filter(t=>t.done).length;
+  const pct=data.todos.length?Math.round(done/data.todos.length*100):100;
+  return `<div class="panel todo-progress"><div class="progress-head"><strong>行前准备进度</strong><span>${done} / ${data.todos.length} 已完成 · ${pct}%</span></div><div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div><div class="micro">点击「自由编辑」后可勾选、修改、增删及调整顺序；修改会同步给家人。</div></div>
+  <div class="todo-group"><h3>✦ 全家出发前要做的事</h3><div class="todo-drag-hint edit-only">按住右侧 ⠿ 拖动排序，或点击 ↑ ↓ 调整位置。</div>
+  <div class="todo-list" id="todoList">${data.todos.map((t,i)=>`<div class="todo-item ${t.done?'done':''}" data-todo-row="${e(t.id)}">
+    <input type="checkbox" class="todo-check" data-todo="${e(t.id)}" aria-label="完成：${e(t.text)}" ${t.done?'checked':''} ${!edit?'disabled':''}>
+    <span class="todo-text">${e(t.text)}</span>
+    <div class="todo-actions edit-only">
+      <button type="button" class="todo-tool" data-action="edit-todo" data-id="${e(t.id)}" aria-label="修改待办事项" title="编辑文字">✎</button>
+      <button type="button" class="todo-tool" data-action="move-todo" data-id="${e(t.id)}" data-direction="up" title="上移" aria-label="上移" ${i===0?'disabled':''}>↑</button>
+      <button type="button" class="todo-tool" data-action="move-todo" data-id="${e(t.id)}" data-direction="down" title="下移" aria-label="下移" ${i===data.todos.length-1?'disabled':''}>↓</button>
+      <button type="button" class="todo-grip" data-todo-drag="${e(t.id)}" title="按住拖动排序" aria-label="拖动此待办事项排序">⠿</button>
+      <button type="button" class="todo-tool todo-remove" data-action="remove-todo" data-id="${e(t.id)}" aria-label="删除待办事项" title="删除">×</button>
+    </div></div>`).join('')}</div>
+    <form id="todoForm" class="todo-add edit-only"><input name="todoText" maxlength="180" placeholder="新增待办事项，例如：预约除夕晚餐" required><button type="submit">＋ 添加</button></form></div>
+    <div class="backup-actions" aria-label="行程数据备份"><button type="button" class="small-btn" data-action="export">⬇ 导出行程备份</button><button type="button" class="small-btn" data-action="reload-cloud">↻ 重新加载云端</button><button type="button" class="small-btn edit-only" data-action="import">↥ 导入备份</button><input type="file" id="importFile" accept=".json,application/json" style="display:none"></div>`;
+}
+// Manual pointer-drag for iOS Safari, Android and desktop. Only the grip starts a drag;
+// scrolling or tapping other controls never accidentally rearranges the checklist.
+let todoDrag=null;
+function clearTodoDrag(){
+  if(!todoDrag)return;
+  document.querySelectorAll('.todo-drop-before,.todo-drop-after,.todo-drag-source').forEach(el=>
+    el.classList.remove('todo-drop-before','todo-drop-after','todo-drag-source'));
+  todoDrag.ghost?.remove();todoDrag=null;
+  window.removeEventListener('pointermove',onTodoDragMove);
+  window.removeEventListener('pointerup',onTodoDragEnd);
+  window.removeEventListener('pointercancel',onTodoDragCancel);
+  window.removeEventListener('keydown',onTodoDragKeydown);
+}
+function onTodoDragPointerDown(ev){
+  const grip=ev.target.closest('[data-todo-drag]');
+  if(!grip||!edit||ev.button!==0||todoDrag)return;
+  const row=grip.closest('[data-todo-row]');
+  if(!row)return;
+  const bounds=row.getBoundingClientRect();
+  todoDrag={id:String(grip.dataset.todoDrag),pointerId:ev.pointerId,source:row,
+    x:ev.clientX,y:ev.clientY,grabX:ev.clientX-bounds.left,grabY:ev.clientY-bounds.top,
+    width:bounds.width,height:bounds.height,started:false,target:null,after:false,ghost:null};
+  window.addEventListener('pointermove',onTodoDragMove,{passive:false});
+  window.addEventListener('pointerup',onTodoDragEnd);
+  window.addEventListener('pointercancel',onTodoDragCancel);
+  window.addEventListener('keydown',onTodoDragKeydown);
+}
+function findTodoDrop(y){
+  const list=document.getElementById('todoList');if(!list)return null;
+  const bounds=list.getBoundingClientRect();
+  if(y<bounds.top-28||y>bounds.bottom+28)return null;
+  const rows=[...list.querySelectorAll('[data-todo-row]')].filter(r=>String(r.dataset.todoRow)!==todoDrag?.id);
+  if(!rows.length)return null;
+  let best=rows[0],dist=Infinity;
+  for(const row of rows){const b=row.getBoundingClientRect(),d=Math.abs(y-(b.top+b.bottom)/2);
+    if(d<dist){best=row;dist=d}}
+  const r=best.getBoundingClientRect();
+  return {row:best,id:String(best.dataset.todoRow),after:y>(r.top+r.bottom)/2};
+}
+function onTodoDragMove(ev){
+  const d=todoDrag;if(!d||ev.pointerId!==d.pointerId)return;
+  const shift=Math.hypot(ev.clientX-d.x,ev.clientY-d.y);
+  if(!d.started&&shift<7)return;
+  if(!d.started){
+    d.started=true;
+    d.source.classList.add('todo-drag-source');
+    d.ghost=d.source.cloneNode(true);
+    d.ghost.classList.remove('todo-drag-source');d.ghost.classList.add('todo-drag-ghost');
+    d.ghost.style.width=d.width+'px';d.ghost.style.minHeight=d.height+'px';
+    document.body.appendChild(d.ghost);
+  }
+  ev.preventDefault();
+  d.ghost.style.left=(ev.clientX-d.grabX)+'px';
+  d.ghost.style.top=(ev.clientY-d.grabY)+'px';
+  const drop=findTodoDrop(ev.clientY);
+  document.querySelectorAll('.todo-drop-before,.todo-drop-after').forEach(el=>el.classList.remove('todo-drop-before','todo-drop-after'));
+  if(drop){d.target=drop.id;d.after=drop.after;
+    drop.row.classList.add(drop.after?'todo-drop-after':'todo-drop-before');}
+  else d.target=null;
+  // A modest scroll assist while dragging to items near the screen edge.
+  if(ev.clientY<65)window.scrollBy(0,-18);
+  else if(ev.clientY>window.innerHeight-105)window.scrollBy(0,18);
+}
+async function onTodoDragEnd(ev){
+  const d=todoDrag;if(!d||ev.pointerId!==d.pointerId)return;
+  const shouldMove=d.started&&d.target;
+  const id=d.id,target=d.target,after=d.after;
+  clearTodoDrag();
+  if(shouldMove&&reorderTodo(id,target,after)){render();await persist(true)}
+}
+function onTodoDragCancel(ev){if(todoDrag&&ev.pointerId===todoDrag.pointerId)clearTodoDrag()}
+function onTodoDragKeydown(ev){if(ev.key==='Escape')clearTodoDrag()}
+document.addEventListener('pointerdown',onTodoDragPointerDown);
+
 function modal(content){element('modalRoot').innerHTML=`<div class="modal-overlay" id="overlay"><div class="modal" role="dialog" aria-modal="true">${content}</div></div>`;}
 function closeModal(){element('modalRoot').innerHTML=''}
 function field(name,label,value='',tag='input',other=''){const v=e(value);return `<div class="field"><label for="field-${name}">${label}</label>${tag==='textarea'?`<textarea id="field-${name}" name="${name}" ${other}>${v}</textarea>`:`<input id="field-${name}" name="${name}" value="${v}" ${other}>`}</div>`}
@@ -611,7 +757,7 @@ function bookingForm(id){
 function downloadFile(){const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download='2027春节家庭日本旅行_备份.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);toast('已导出行程备份')}
 async function share(){const url=window.location.href.split('#')[0];const msg='🇯🇵 2027 春节日本关东家庭旅行\n2月3–11日｜东京 · 箱根 · 伊豆 · 富士山 · 迪士尼\n'+url;if(navigator.share&&/^https?:/.test(url)){try{await navigator.share({title:'春节日本家庭旅行',text:'春节关东之行 · 2027家庭旅行',url});return}catch(_){}}try{await navigator.clipboard.writeText(msg);toast('已复制网址，可粘贴到微信')}catch(_){const t=document.createElement('textarea');t.value=msg;document.body.appendChild(t);t.select();try{document.execCommand('copy');toast('已复制分享内容')}catch(_){toast('请复制浏览器地址栏网址')}t.remove()}}
 function formData(form){return Object.fromEntries(new FormData(form).entries())}
-document.addEventListener('click',async ev=>{const tabEl=ev.target.closest('[data-tab]');if(tabEl){setTab(tabEl.dataset.tab);return}const dayEl=ev.target.closest('[data-day]');if(dayEl&&dayEl.classList.contains('day-pill')){activeDay=+dayEl.dataset.day;try{localStorage.setItem(selectedDayKey,String(activeDay))}catch(_){}render();return}const f=ev.target.closest('[data-filter]');if(f){filter=f.dataset.filter;render();return}const act=ev.target.closest('[data-action]');if(!act)return;const {action,id,day}=act.dataset;if(action==='close'){closeModal();return}if(action==='toggle-edit'){beginEdit();return}if(action==='cycle-dot'){const d=data.days.find(d=>d.id===+day);const item=d?.events.find(x=>x.id===id);if(!item)return;const current=eventDotColor(item);item.dotColor=DOT_COLORS[(DOT_COLORS.indexOf(current)+1)%DOT_COLORS.length];render();await persist(true);return}if(action==='view-stays'){filter='stay';setTab('bookings');return}if(action==='move-event'&&edit){if(moveEvent(+day,id,act.dataset.direction==='up'?-1:1)){render();await persist(true)}return}if(action==='edit-map-notes'&&edit){editMapNotesForm();return}if(action==='edit-day'&&edit){editDayForm(+id);return}if(action==='add-event'&&edit){eventForm(+id);return}if(action==='edit-event'&&edit){eventForm(+day,id);return}if(action==='add-booking'&&edit){bookingForm();return}if(action==='edit-booking'&&edit){bookingForm(id);return}if(action==='reload-cloud'){
+document.addEventListener('click',async ev=>{const tabEl=ev.target.closest('[data-tab]');if(tabEl){setTab(tabEl.dataset.tab);return}const dayEl=ev.target.closest('[data-day]');if(dayEl&&dayEl.classList.contains('day-pill')){activeDay=+dayEl.dataset.day;try{localStorage.setItem(selectedDayKey,String(activeDay))}catch(_){}render();return}const f=ev.target.closest('[data-filter]');if(f){filter=f.dataset.filter;render();return}const act=ev.target.closest('[data-action]');if(!act)return;const {action,id,day}=act.dataset;if(action==='close'){closeModal();return}if(action==='toggle-edit'){beginEdit();return}if(action==='cycle-dot'){const d=data.days.find(d=>d.id===+day);const item=d?.events.find(x=>x.id===id);if(!item)return;const current=eventDotColor(item);item.dotColor=DOT_COLORS[(DOT_COLORS.indexOf(current)+1)%DOT_COLORS.length];render();await persist(true);return}if(action==='view-stays'){filter='stay';setTab('bookings');return}if(action==='edit-todo'&&edit){todoEditForm(id);return}if(action==='move-todo'&&edit){if(moveTodo(id,act.dataset.direction==='up'?-1:1)){render();await persist(true)}return}if(action==='move-event'&&edit){if(moveEvent(+day,id,act.dataset.direction==='up'?-1:1)){render();await persist(true)}return}if(action==='edit-map-notes'&&edit){editMapNotesForm();return}if(action==='edit-day'&&edit){editDayForm(+id);return}if(action==='add-event'&&edit){eventForm(+id);return}if(action==='edit-event'&&edit){eventForm(+day,id);return}if(action==='add-booking'&&edit){bookingForm();return}if(action==='edit-booking'&&edit){bookingForm(id);return}if(action==='reload-cloud'){
   if(!cloud){toast('暂时无法连接云端');return}
   if(dirty&&!confirm('当前设备有尚未同步的修改。建议先导出 JSON 备份。确定放弃这些修改并读取最新云端数据吗？'))return;
   try{const res=await timedFetch('/api/trip',{cache:'no-store'},8000);
@@ -621,7 +767,7 @@ document.addEventListener('click',async ev=>{const tabEl=ev.target.closest('[dat
     setDirtyState(false);saveLocal();render();toast('已重新加载云端最新行程');
   }catch(err){toast('加载失败：'+err.message)}return;
  }if(action==='export'){downloadFile();return}if(action==='import'&&edit){element('importFile')?.click();return}if(action==='share'){share();return}if(action==='delete-event'&&edit){if(!confirm('确定删除这条行程吗？'))return;const d=data.days.find(d=>d.id===+day);if(!d)return;d.events=d.events.filter(x=>x.id!==id);closeModal();render();await persist();return}if(action==='delete-booking'&&edit){if(!confirm('确定删除这条预订吗？'))return;data.bookings=data.bookings.filter(x=>x.id!==id);closeModal();render();await persist();return}if(action==='remove-todo'&&edit){data.todos=data.todos.filter(t=>t.id!==id);render();await persist();return}});
-document.addEventListener('submit',async ev=>{const f=ev.target;if(!['dayForm','eventForm','bookingForm','todoForm','mapNotesForm'].includes(f.id))return;ev.preventDefault();const v=formData(f);if(f.id==='bookingForm'&&v.type==='stay'&&Boolean(v.checkIn)!==Boolean(v.checkOut)){toast('酒店必须同时填写入住和退房日期');return;}if(f.id==='bookingForm'&&v.type==='stay'&&v.checkIn&&v.checkOut&&v.checkOut<=v.checkIn){toast('退房日期必须晚于入住日期');return;}if(f.id==='mapNotesForm'){data.mapNotes={...data.mapNotes,intro:v.mapIntro.trim(),stops:places.map((p,i)=>(v['stop'+i]||'').trim())}}if(f.id==='dayForm'){const d=data.days.find(d=>d.id===+f.dataset.id);if(!d)return;d.title=v.title.trim();d.summary=v.summary.trim();d.hotel=v.hotel.trim();d.icon=v.icon.trim()||'📍'}if(f.id==='eventForm'){const d=data.days.find(d=>d.id===+f.dataset.day);if(!d)return;let ex=d.events.find(x=>x.id===f.dataset.event);if(!ex){ex={id:uid()};d.events.push(ex)}Object.assign(ex,{time:v.time.trim(),type:v.type,title:v.title.trim(),note:v.note.trim(),location:v.location.trim(),status:v.status})}if(f.id==='bookingForm'){let b=data.bookings.find(x=>x.id===f.dataset.id);if(!b){b={id:uid()};data.bookings.push(b)}Object.assign(b,{type:v.type,title:v.title.trim(),dates:v.dates.trim(),people:v.people.trim(),details:v.details.trim(),status:v.status,location:v.location.trim(),reference:v.reference.trim()});if(v.type==='stay'){if(v.checkIn&&v.checkOut&&v.checkOut<=v.checkIn){toast('退房日期必须晚于入住日期');return;}b.checkIn=v.checkIn||'';b.checkOut=v.checkOut||'';if(v.checkIn&&v.checkOut)b.dates=v.checkIn.slice(5).replace('-', '/')+' 入住 · '+v.checkOut.slice(5).replace('-', '/')+' 离店';}else{b.checkIn='';b.checkOut='';}}if(f.id==='todoForm'){if(!edit)return;const t=v.todoText.trim();if(!t)return;data.todos.push({id:uid(),text:t,done:false})}closeModal();render();await persist()});
+document.addEventListener('submit',async ev=>{const f=ev.target;if(!['dayForm','eventForm','bookingForm','todoForm','todoEditForm','mapNotesForm'].includes(f.id))return;ev.preventDefault();const v=formData(f);if(f.id==='bookingForm'&&v.type==='stay'&&Boolean(v.checkIn)!==Boolean(v.checkOut)){toast('酒店必须同时填写入住和退房日期');return;}if(f.id==='bookingForm'&&v.type==='stay'&&v.checkIn&&v.checkOut&&v.checkOut<=v.checkIn){toast('退房日期必须晚于入住日期');return;}if(f.id==='mapNotesForm'){data.mapNotes={...data.mapNotes,intro:v.mapIntro.trim(),stops:places.map((p,i)=>(v['stop'+i]||'').trim())}}if(f.id==='dayForm'){const d=data.days.find(d=>d.id===+f.dataset.id);if(!d)return;d.title=v.title.trim();d.summary=v.summary.trim();d.hotel=v.hotel.trim();d.icon=v.icon.trim()||'📍'}if(f.id==='eventForm'){const d=data.days.find(d=>d.id===+f.dataset.day);if(!d)return;let ex=d.events.find(x=>x.id===f.dataset.event);if(!ex){ex={id:uid()};d.events.push(ex)}Object.assign(ex,{time:v.time.trim(),type:v.type,title:v.title.trim(),note:v.note.trim(),location:v.location.trim(),status:v.status})}if(f.id==='bookingForm'){let b=data.bookings.find(x=>x.id===f.dataset.id);if(!b){b={id:uid()};data.bookings.push(b)}Object.assign(b,{type:v.type,title:v.title.trim(),dates:v.dates.trim(),people:v.people.trim(),details:v.details.trim(),status:v.status,location:v.location.trim(),reference:v.reference.trim()});if(v.type==='stay'){if(v.checkIn&&v.checkOut&&v.checkOut<=v.checkIn){toast('退房日期必须晚于入住日期');return;}b.checkIn=v.checkIn||'';b.checkOut=v.checkOut||'';if(v.checkIn&&v.checkOut)b.dates=v.checkIn.slice(5).replace('-', '/')+' 入住 · '+v.checkOut.slice(5).replace('-', '/')+' 离店';}else{b.checkIn='';b.checkOut='';}}if(f.id==='todoForm'){if(!edit)return;const t=v.todoText.trim();if(!t)return;data.todos.push({id:uid(),text:t,done:false})}if(f.id==='todoEditForm'){if(!edit)return;const t=v.todoText.trim();if(!t){toast('待办事项不能为空');return}const item=data.todos.find(x=>String(x.id)===String(f.dataset.id));if(!item)return;item.text=t}closeModal();render();await persist()});
 document.addEventListener('change',async ev=>{const t=ev.target;if(t.matches('[data-todo]')&&edit){const item=data.todos.find(x=>x.id===t.dataset.todo);if(item){item.done=t.checked;render();await persist()}}if(t.id==='mapDayFilter'){mapDayFilter=t.value;render();return}if(t.id==='field-type'&&t.closest('#bookingForm')){element('stayDateFields')?.classList.toggle('hidden-fields',t.value!=='stay');return}if(t.id==='importFile'&&edit){const file=t.files&&t.files[0];if(!file)return;try{const obj=JSON.parse(await file.text());if(!obj||!Array.isArray(obj.days)||obj.days.length!==9||!Array.isArray(obj.bookings)||!Array.isArray(obj.todos))throw Error('文件结构不正确');if(!confirm('导入会替换当前行程。确定继续？'))return;data=obj;render();await persist()}catch(err){toast('导入失败：'+err.message)}}});
 element('editToggle').addEventListener('click',beginEdit);element('shareBtn').addEventListener('click',share);
 // 作为独立 HTML 直接打开时使用本地数据；云端部署后自动从 /api/trip 同步。
