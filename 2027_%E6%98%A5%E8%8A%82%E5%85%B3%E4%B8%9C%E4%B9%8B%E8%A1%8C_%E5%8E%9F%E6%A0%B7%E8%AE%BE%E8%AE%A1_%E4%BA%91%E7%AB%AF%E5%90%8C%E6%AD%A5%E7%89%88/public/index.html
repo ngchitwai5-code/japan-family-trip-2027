@@ -134,6 +134,15 @@ button.event-bullet:focus-visible{outline:2px solid #2d7565;outline-offset:5px}
  .todo-actions .todo-tool,.todo-actions .todo-grip{min-width:26px;height:30px;font-size:14px;padding:0 2px}
  .todo-actions .todo-grip{font-size:20px}.todo-list .todo-text{font-size:12px}}
 @media(max-width:370px){.todo-actions .todo-tool,.todo-actions .todo-grip{min-width:24px}}
+
+/* 8-day itinerary migration prompt: only visible while legacy cloud dates still exist. */
+.plan-upgrade-panel,.booking-migration-panel{border:1px solid #e2d8bd;background:#fffaf0;border-radius:15px;padding:15px 17px;margin-top:15px;color:#6e5a31;font-size:12px;line-height:1.8}
+.plan-upgrade-panel[hidden],.booking-migration-panel[hidden]{display:none!important}
+.plan-upgrade-panel strong{font-size:14px;color:#5b4923}
+.plan-upgrade-panel p{margin-top:5px}
+.plan-upgrade-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.booking-migration-panel{background:#fff9f5;border-color:#eacdbb;color:#9a5940}
+
 </style>
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -146,7 +155,7 @@ button.event-bullet:focus-visible{outline:2px solid #2d7565;outline-offset:5px}
     </header>
     <main class="shell main-layout">
       <aside class="sidebar">
-        <div class="side-top"><div class="side-small">TRIP OVERVIEW</div><h2>春节关东<br>家庭之旅</h2><p>2027.02.03 — 02.11</p></div>
+        <div class="side-top"><div class="side-small">TRIP OVERVIEW</div><h2>春节关东<br>家庭之旅</h2><p>2027.02.03 — 02.10</p></div>
         <div class="side-nav" id="sidebarNav">
           <button data-tab="schedule" class="nav-item active"><span>▦</span> 每日行程</button>
           <button data-tab="bookings" class="nav-item"><span>▤</span> 航班与住宿</button>
@@ -156,8 +165,13 @@ button.event-bullet:focus-visible{outline:2px solid #2d7565;outline-offset:5px}
       </aside>
       <div class="content-area">
         <div id="hero" class="hero">
-          <div class="hero-content"><div class="eyebrow">JAPAN · FEBRUARY 2027</div><div class="hero-title">春节关东之行</div><p>东京 · 箱根 · 伊豆 · 富士山 · 迪士尼</p><div class="hero-facts"><span>◷ 9 天 8 晚</span></div></div>
+          <div class="hero-content"><div class="eyebrow">JAPAN · FEBRUARY 2027</div><div class="hero-title">春节关东之行</div><p>东京 · 箱根 · 伊豆 · 富士山 · 迪士尼</p><div class="hero-facts"><span>◷ 8 天 7 晚</span></div></div>
         </div>
+        <section id="planUpgradePanel" class="plan-upgrade-panel" hidden>
+          <div><strong>行程日期有新调整：2月10日返程</strong><p>箱根1晚（2/5）、伊豆2晚（2/6–8），共8天7晚。检测到旧的9天云端行程，请先导出备份，再应用新版。已确认的旧预订会保留并提示核对。</p></div>
+          <div class="plan-upgrade-actions"><button type="button" class="secondary" data-action="export">先导出备份</button><button type="button" class="primary" data-action="upgrade-trip">应用新版行程</button></div>
+        </section>
+        <section id="bookingMigrationNotice" class="booking-migration-panel" hidden></section>
         <div class="section-head"><div><div class="label-overline" id="sectionEyebrow">OUR ITINERARY</div><h1 id="sectionTitle">每日行程</h1></div><button id="editToggle" class="edit-button" type="button"><span>✎</span> <span id="editLabel">进入编辑</span></button></div>
         <div id="view"></div>
         <footer class="site-footer">Made for our family · 2027 日本关东春节旅行 <span id="footerUpdated"></span></footer>
@@ -175,7 +189,7 @@ button.event-bullet:focus-visible{outline:2px solid #2d7565;outline-offset:5px}
   <script>
 (()=>{
 'use strict';
-const weekdays=['周三','周四','周五','周六','周日','周一','周二','周三','周四'];
+const weekdays=['周三','周四','周五','周六','周日','周一','周二','周三'];
 const types={flight:'✈️ 航班',stay:'🏨 住宿',car:'🚙 租车',ticket:'🎟️ 门票',other:'📌 其他'};
 const statuses={pending:'待确认',planned:'规划中',confirmed:'已确认'};
 const eventTypes={visit:'📍 景点',transit:'🚙 交通',stay:'🏨 住宿',food:'🍜 餐饮',other:'✨ 其他'};
@@ -183,7 +197,7 @@ const eventTypes={visit:'📍 景点',transit:'🚙 交通',stay:'🏨 住宿',f
  const DOT_COLORS=['green','orange','blue','yellow','purple','gray'];
  const DOT_COLOR_NAMES={green:'绿色',orange:'橙色',blue:'蓝色',yellow:'黄色',purple:'紫色',gray:'灰色'};
  const DEFAULT_MAP_NOTES={
-  intro:'2月5日东京取车 → 箱根连住2晚 → 2月7日伊豆 → 2月8日回东京。御殿场为富士山可选绕行地点；地图路线为位置示意，非实时道路导航。'
+  intro:'2月5日东京取车 → 箱根住1晚 → 2月6日伊豆（连住2晚）→ 2月8日回东京。御殿场为富士山可选绕行地点；地图路线为位置示意，非实时道路导航。'
  };
 
 const places=[
@@ -195,7 +209,7 @@ const places=[
 ];
 const D=(n,title,place,icon,summary,holiday,hotel,events)=>({id:n,date:`2027-02-${String(n+2).padStart(2,'0')}`,weekday:weekdays[n-1],title,place,icon,summary,holiday,hotel,events:events.map((e,i)=>({id:`e${n}_${i}`,time:e[0],type:e[1],title:e[2],note:e[3],location:e[4]||'',status:e[5]||'planned'}))});
 const SEED={
- version:1,
+ version:2,
  name:'2027 春节关东家庭旅行',
  updatedAt:null,
  days:[
@@ -214,15 +228,15 @@ const SEED={
    ['下午','visit','前往箱根 · 沿途观光','根据取车地点与路况灵活安排','箱根'],
    ['晚上','food','温泉酒店 · 除夕团圆饭','尽量优先预订包含晚餐的温泉旅馆','箱根']
   ]),
-  D(4,'箱根 · 春节慢旅行','箱根','⛩️','不赶路，在箱根玩一整天。箱根神社、芦之湖及大涌谷按天气与家人体力灵活选择。','春节初一','箱根温泉酒店 · 第 2 晚',[
-   ['上午','visit','箱根神社 · 芦之湖','适合拍全家福；景点顺序待调整','箱根神社'],
-   ['下午','visit','大涌谷或芦之湖观景','视开放情况、天气及冬季路况选择','大涌谷'],
-   ['晚上','stay','温泉休闲 · 家庭晚餐','第二晚继续在箱根休息','箱根']
+  D(4,'箱根 → 伊豆 · 春节初一','伊豆','🌸','上午从箱根出发前往伊豆，沿途结合天气和路况观光。下午入住伊豆，开启两晚慢旅行。','春节初一','伊豆酒店 · 第 1 晚',[
+   ['上午','transit','箱根出发 · 自驾前往伊豆','根据箱根住宿位置与伊豆入住区域规划路线，途中适当休息','箱根'],
+   ['下午','visit','伊豆第一站 · 温泉或海岸','修善寺、伊豆海岸等择一，不必赶多个远距离景点','伊豆'],
+   ['晚上','stay','入住伊豆 · 春节团圆晚餐','伊豆第一晚，预留家庭团聚及休息时间','伊豆']
   ]),
-  D(5,'箱根 → 伊豆 · 海岸与温泉','伊豆','🌊','离开箱根，自驾前往伊豆半岛。可在修善寺、河津或海岸线中选择重点，不需要全部赶完。','','伊豆酒店 · 待确认',[
-   ['上午','transit','箱根出发 · 自驾前往伊豆','具体路线取决于伊豆入住区域','伊豆'],
-   ['下午','visit','伊豆观光 · 待选路线','修善寺、河津早樱或伊豆海岸择一/择二','伊豆'],
-   ['晚上','stay','入住伊豆 · 温泉或海景','期待体验伊豆当地美食','伊豆']
+  D(5,'伊豆 · 海岸与温泉慢游','伊豆','🌊','在伊豆完整游玩一天。可根据住宿区域选择修善寺、河津或东部海岸，尽量减少折返。','','伊豆酒店 · 第 2 晚',[
+   ['上午','visit','伊豆观光 · 待选路线','结合住宿地点选择修善寺、河津或海岸景点','伊豆'],
+   ['下午','visit','伊豆海景与温泉体验','放慢节奏，留意可能的季节性花期及天气','伊豆'],
+   ['晚上','stay','伊豆第二晚 · 当地美食','连住第二晚，晚餐地点待确认','伊豆']
   ]),
   D(6,'伊豆 → 东京 · 富士山备选','东京','🗻','从伊豆返回东京。若天气好、路线合适，可绕经御殿场等富士山观景区；否则直接回东京。','','东京酒店 · 待确认',[
    ['上午','transit','伊豆出发 · 返回东京方向','考虑驾驶距离及路况留足休息时间','伊豆'],
@@ -233,13 +247,8 @@ const SEED={
    ['全天','visit','东京迪士尼一日游','园区二选一；购买门票后再补充入园细节','东京迪士尼度假区'],
    ['晚上','transit','返回东京酒店','根据游玩体力决定返程时间','东京']
   ]),
-  D(8,'东京自由行 · 美食购物','东京','🛍️','最后一个完整旅行日，以家庭自由活动、美食购物和全家合影为主。','','东京酒店 · 第 3 晚',[
-   ['上午','visit','东京自由观光','浅草、上野或其他区域，可由家人商量决定','东京'],
-   ['下午','visit','购物 · 购买伴手礼','保留自由时间，避免行程过满','东京'],
-   ['晚上','food','最后一晚 · 家庭晚餐','可挑选一家方便长辈的餐厅','东京']
-  ]),
-  D(9,'东京出发 · 各自返程','返程','✈️','五个人按照各自的返程航班前往机场，返回原本所在地。需要分别核对时间、机场与行李。','','无 · 当日返程',[
-   ['待定','transit','炜与爸爸妈妈返程','回程目的地、航班待补充','东京机场'],
+  D(8,'东京出发 · 各自返程','返程','✈️','五个人根据各自的2月10日返程航班前往机场，分别返回目的地。请核对机场、出发时间及行李。','','无 · 当日返程',[
+   ['待定','transit','炜与爸爸妈妈返程','返程目的地、航班与出发机场待补充','东京机场'],
    ['待定','transit','烨返程','返程航班及目的地待补充','东京机场'],
    ['待定','transit','思返程','返程航班及目的地待补充','东京机场']
   ])
@@ -249,23 +258,23 @@ const SEED={
   {id:'b2',type:'flight',title:'炜、爸爸、妈妈｜香港 → 东京',dates:'2月4日',people:'炜、爸爸、妈妈',details:'航班号和东京机场待补充',status:'pending',location:'香港 → 东京',reference:''},
   {id:'b3',type:'flight',title:'思｜香港 → 东京',dates:'2月4日',people:'思',details:'航班号和东京机场待补充',status:'pending',location:'香港 → 东京',reference:''},
   {id:'b4',type:'flight',title:'烨｜胡志明市 → 东京',dates:'2月4日',people:'烨',details:'航班号和东京机场待补充',status:'pending',location:'胡志明市 → 东京',reference:''},
-  {id:'b5',type:'flight',title:'2月11日 · 各自返程',dates:'2月11日',people:'五人分别安排',details:'返程航班、目的地、时间待补充',status:'pending',location:'东京',reference:''},
+  {id:'b5',type:'flight',title:'2月10日 · 各自返程',dates:'2月10日',people:'五人分别安排',details:'返程航班、目的地、时间待补充',status:'pending',location:'东京',reference:''},
   {id:'b6',type:'stay',title:'香港酒店 · 1晚',dates:'2/3 入住 · 2/4 离店',people:'炜、爸爸、妈妈',details:'酒店名称待确认',status:'pending',location:'香港',reference:''},
   {id:'b7',type:'stay',title:'东京酒店 · 1晚',dates:'2/4 入住 · 2/5 离店',people:'一家五口',details:'东京集合后的第一晚',status:'pending',location:'东京',reference:''},
-  {id:'b8',type:'stay',title:'箱根温泉酒店 · 2晚',dates:'2/5 入住 · 2/7 离店',people:'一家五口',details:'含除夕和春节初一；可考虑一泊二食',status:'pending',location:'箱根',reference:''},
-  {id:'b9',type:'stay',title:'伊豆酒店 · 1晚',dates:'2/7 入住 · 2/8 离店',people:'一家五口',details:'具体入住区域待选择',status:'pending',location:'伊豆',reference:''},
-  {id:'b10',type:'stay',title:'东京酒店 · 3晚',dates:'2/8 入住 · 2/11 离店',people:'一家五口',details:'迪士尼与东京自由行期间',status:'pending',location:'东京',reference:''},
+  {id:'b8',type:'stay',title:'箱根温泉酒店 · 1晚',dates:'2/5 入住 · 2/6 离店',people:'一家五口',details:'2月5日除夕夜入住；可考虑一泊二食',status:'pending',location:'箱根',reference:''},
+  {id:'b9',type:'stay',title:'伊豆酒店 · 2晚',dates:'2/6 入住 · 2/8 离店',people:'一家五口',details:'具体入住区域待选择',status:'pending',location:'伊豆',reference:''},
+  {id:'b10',type:'stay',title:'东京酒店 · 2晚',dates:'2/8 入住 · 2/10 离店',people:'一家五口',details:'2月8日回东京，2月9日迪士尼，2月10日返程',status:'pending',location:'东京',reference:''},
   {id:'b11',type:'car',title:'东京取还车 · 4天',dates:'2/5 取车 · 2/8 还车',people:'一家五口',details:'优先考虑8座MPV、行李容量及冬季轮胎',status:'pending',location:'东京',reference:''},
   {id:'b12',type:'ticket',title:'东京迪士尼门票',dates:'2月9日',people:'一家五口',details:'Disneyland / DisneySea 二选一',status:'pending',location:'东京迪士尼',reference:''}
  ],
  todos:[
   {id:'t1',text:'确认5个人的入境证件及日本签证/免签条件',done:false},
   {id:'t2',text:'核对2月4日三组航班的东京抵达机场和时间',done:false},
-  {id:'t3',text:'确认2月11日每个人的返程航班',done:false},
+  {id:'t3',text:'确认2月10日每个人的返程航班',done:false},
   {id:'t4',text:'预订2月3日香港酒店',done:false},
-  {id:'t5',text:'预订东京酒店（2月4日1晚及2月8日起3晚）',done:false},
-  {id:'t6',text:'预订箱根温泉酒店（2月5–7日，优先除夕晚餐）',done:false},
-  {id:'t7',text:'确定伊豆游览区域并预订2月7日酒店',done:false},
+  {id:'t5',text:'预订东京酒店（2月4日1晚及2月8日起2晚）',done:false},
+  {id:'t6',text:'预订箱根温泉酒店（2月5–6日，优先除夕晚餐）',done:false},
+  {id:'t7',text:'确定伊豆游览区域并预订2月6–8日酒店（2晚）',done:false},
   {id:'t8',text:'确认日本自驾所需的合规驾驶证件与驾驶资格',done:false},
   {id:'t9',text:'租适合5人和行李的车辆，确认冬胎与保险',done:false},
   {id:'t10',text:'决定2月9日迪士尼园区并购买门票',done:false},
@@ -274,7 +283,7 @@ const SEED={
  ]
 };
 // Lunar labels are presentation-only, so cloud-stored family edits remain untouched.
-// Gregorian 2027-02-03 through 2027-02-11 (verified against lunar calendar).
+// Gregorian 2027-02-03 through 2027-02-10 (verified against lunar calendar).
 const LUNAR_DATES={
   1:{short:'腊廿七',full:'腊月廿七'},
   2:{short:'腊廿八',full:'腊月廿八'},
@@ -283,8 +292,7 @@ const LUNAR_DATES={
   5:{short:'正月初二',full:'正月初二'},
   6:{short:'正月初三',full:'正月初三'},
   7:{short:'正月初四',full:'正月初四'},
-  8:{short:'正月初五',full:'正月初五'},
-  9:{short:'正月初六',full:'正月初六'}
+  8:{short:'正月初五',full:'正月初五'}
 };
 const key='japan-family-2027-v1';
 const selectedDayKey=key+'-selected-day';
@@ -303,7 +311,7 @@ const gmap=place=>'https://www.google.com/maps/search/?api=1&query='+enc(place);
  const mapStopNote=i=>typeof data.mapNotes?.stops?.[i]==='string'?data.mapNotes.stops[i]:places[i].subtitle;
 
 const local=()=>{try{let d=JSON.parse(localStorage.getItem(key));return d&&Array.isArray(d.days)&&Array.isArray(d.bookings)&&Array.isArray(d.todos)?d:null}catch(_){return null}};
-const readSavedDay=()=>{try{const n=Number(localStorage.getItem(selectedDayKey));return Number.isInteger(n)&&n>=1&&n<=9?n:1}catch(_){return 1}};
+const readSavedDay=()=>{try{const n=Number(localStorage.getItem(selectedDayKey));return Number.isInteger(n)&&n>=1&&n<=8?n:1}catch(_){return 1}};
 const readJSON=(storageKey,fallback)=>{try{return JSON.parse(localStorage.getItem(storageKey))||fallback}catch(_){return fallback}};
 let data=local()||clone(SEED),tab='schedule',activeDay=readSavedDay(),filter='all',edit=false,cloud=false,
   mapObject=null,mapGeneration=0,mapDayFilter='all',lastRemoteStamp=null,hasRemoteData=false;
@@ -397,7 +405,7 @@ function setDirtyState(flag){
   try{if(flag){localStorage.setItem(pendingKey,'1');localStorage.setItem(baselineKey,JSON.stringify(syncedSnapshot));}
     else{localStorage.removeItem(pendingKey);localStorage.removeItem(baselineKey);}}catch(_){}
 }
-function visibleDataOK(obj){return obj&&Array.isArray(obj.days)&&obj.days.length===9&&Array.isArray(obj.bookings)&&Array.isArray(obj.todos)}
+function visibleDataOK(obj){return obj&&Array.isArray(obj.days)&&[8,9].includes(obj.days.length)&&Array.isArray(obj.bookings)&&Array.isArray(obj.todos)}
 async function timedFetch(url,options={},ms=8000){const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),ms);try{return await fetch(url,{...options,signal:controller.signal})}finally{clearTimeout(timer)}}
 
 function syncBadge(){
@@ -421,6 +429,7 @@ async function checkCloud(){
   }catch(_){cloud=false;syncBadge();}
 }
 async function persist(quiet=false){
+  if(data.days?.length===9){toast('请先应用新版行程，再保存修改');return;}
   data.updatedAt=new Date().toISOString();
   if(!dirty)setDirtyState(true);
   saveLocal();syncBadge();
@@ -472,7 +481,9 @@ async function poll(){
 }
 function setTab(t){if(!['schedule','bookings','map','todos'].includes(t))return;tab=t;render();if(window.innerWidth<740)window.scrollTo({top:0,behavior:'smooth'})}
 function render(){// Keep the horizontal date selector at its current position during a UI redraw.
-const oldStrip=document.querySelector('#view .day-strip');const priorScroll=oldStrip?oldStrip.scrollLeft:null;if(mapObject){try{mapObject.remove()}catch(_){}mapObject=null}document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));const titles={schedule:['OUR ITINERARY','每日行程'],bookings:['TRAVEL RESERVATIONS','航班与住宿'],map:['EXPLORE THE ROUTE','旅行地图'],todos:['TRAVEL CHECKLIST','出行清单']};element('sectionEyebrow').textContent=titles[tab][0];element('sectionTitle').textContent=titles[tab][1];const et=element('editToggle');et.classList.toggle('active',edit);element('editLabel').textContent=edit?'完成编辑':'自由编辑';document.body.classList.toggle('is-editing',edit);const box=element('view');box.innerHTML=tab==='schedule'?scheduleHTML():tab==='bookings'?bookingsHTML():tab==='map'?mapHTML():todosHTML();if(tab==='schedule'){const strip=box.querySelector('.day-strip');if(strip){if(priorScroll!==null)strip.scrollLeft=priorScroll;const selected=strip.querySelector('.day-pill.active');if(selected){const railBox=strip.getBoundingClientRect(),buttonBox=selected.getBoundingClientRect(),gap=8;if(buttonBox.left<railBox.left+gap)strip.scrollLeft-=railBox.left+gap-buttonBox.left;else if(buttonBox.right>railBox.right-gap)strip.scrollLeft+=buttonBox.right-railBox.right+gap;}}}if(tab==='map')setTimeout(initMap,60);syncBadge()}
+const oldStrip=document.querySelector('#view .day-strip');const priorScroll=oldStrip?oldStrip.scrollLeft:null;if(mapObject){try{mapObject.remove()}catch(_){}mapObject=null}document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));const titles={schedule:['OUR ITINERARY','每日行程'],bookings:['TRAVEL RESERVATIONS','航班与住宿'],map:['EXPLORE THE ROUTE','旅行地图'],todos:['TRAVEL CHECKLIST','出行清单']};element('sectionEyebrow').textContent=titles[tab][0];element('sectionTitle').textContent=titles[tab][1];const et=element('editToggle');et.classList.toggle('active',edit);element('editLabel').textContent=edit?'完成编辑':'自由编辑';document.body.classList.toggle('is-editing',edit);const box=element('view');box.innerHTML=tab==='schedule'?scheduleHTML():tab==='bookings'?bookingsHTML():tab==='map'?mapHTML():todosHTML();if(tab==='schedule'){const strip=box.querySelector('.day-strip');if(strip){if(priorScroll!==null)strip.scrollLeft=priorScroll;const selected=strip.querySelector('.day-pill.active');if(selected){const railBox=strip.getBoundingClientRect(),buttonBox=selected.getBoundingClientRect(),gap=8;if(buttonBox.left<railBox.left+gap)strip.scrollLeft-=railBox.left+gap-buttonBox.left;else if(buttonBox.right>railBox.right-gap)strip.scrollLeft+=buttonBox.right-railBox.right+gap;}}}const p=element('planUpgradePanel');if(p)p.hidden=data.days?.length!==9;
+const w=element('bookingMigrationNotice');if(w){const warnings=(data.migrationWarnings||[]).filter(x=>typeof x==='string'||data.bookings.some(b=>b.id===x.id&&b.dates===x.originalDates));w.hidden=!warnings.length;w.textContent=warnings.length?'⚠️ 旧行程有 '+warnings.length+' 项已确认预订仍为原日期：请进入「航班与住宿」核对并自行改签。':'';}
+if(tab==='map')setTimeout(initMap,60);syncBadge()}
 
 function parseStayDates(b){
   const parseDay=s=>{
@@ -486,7 +497,7 @@ function parseStayDates(b){
   return hits.length>=2&&hits[1]>hits[0]?[hits[0],hits[1]]:null;
 }
 function hotelForDay(day){
-  if(day.id===9)return {title:'无 · 当日返程',source:null};
+  if(day.place==='返程')return {title:'无 · 当日返程',source:null};
   const dayOfMonth=day.id+2;
   const stays=data.bookings.filter(b=>{
     if(b.type!=='stay')return false;
@@ -507,7 +518,7 @@ function scheduleHTML(){const day=data.days.find(d=>d.id===activeDay)||data.days
  <div class="day-strip" role="tablist" aria-label="按日期切换">${data.days.map(d=>`<button role="tab" aria-selected="${d.id===activeDay}" class="day-pill ${d.id===activeDay?'active':''}" data-day="${d.id}"><span class="dw">${e(d.weekday)}</span><span class="dd">${String(d.id+2).padStart(2,'0')}</span><span class="lunar-mini">${e((LUNAR_DATES[d.id]?.short||'')+(d.holiday?'·'+(d.holiday==='春节初一'?'春节':d.holiday):''))}</span></button>`).join('')}</div>
  <div class="day-spotlight"><div><div class="spotline"><span>DAY ${String(day.id).padStart(2,'0')} · 2027年2月${day.id+2}日</span><span class="lunar-chip">${e((LUNAR_DATES[day.id]?.full||'')+(day.holiday?'·'+(day.holiday==='春节初一'?'春节':day.holiday):''))}</span></div><h2>${e(day.title)}</h2><p>${e(day.summary)}</p><div class="spot-actions"><a class="tiny-action" href="${gmap(route)}" target="_blank" rel="noopener">⌖ 查看${e(route)}地图 ↗</a><button class="tiny-action edit-only" data-action="edit-day" data-id="${day.id}">✎ 修改当天介绍</button></div></div><div class="spot-graphic">${day.icon}</div></div>
  <div class="daily-grid"><section class="panel timeline-panel"><div class="card-heading"><div class="card-title">当天安排 <span class="micro">· ${day.events.length} 个事项</span></div><button class="mini-add edit-only" data-action="add-event" data-id="${day.id}">＋ 新增行程</button></div><div class="timeline">${day.events.length?day.events.map((ev,i)=>`<div class="event"><div class="event-time">${e(ev.time)}</div><button type="button" class="event-bullet ${eventDotColor(ev)}" data-action="cycle-dot" data-id="${e(ev.id)}" data-day="${day.id}" aria-label="切换${e(ev.title)}的时间点颜色；当前${DOT_COLOR_NAMES[eventDotColor(ev)]}"></button><div class="event-main"><div class="event-top"><h4>${e(ev.title)}</h4><span class="event-controls edit-only"><button class="sort-btn" type="button" data-action="move-event" data-direction="up" data-id="${e(ev.id)}" data-day="${day.id}" aria-label="上移 ${e(ev.title)}" ${i===0?'disabled':''}>↑</button><button class="sort-btn" type="button" data-action="move-event" data-direction="down" data-id="${e(ev.id)}" data-day="${day.id}" aria-label="下移 ${e(ev.title)}" ${i===day.events.length-1?'disabled':''}>↓</button><button class="event-edit" data-action="edit-event" data-id="${e(ev.id)}" data-day="${day.id}">编辑</button></span></div><p>${e(ev.note)}</p><div class="event-meta">${ev.location?`<a href="${gmap(ev.location)}" target="_blank" rel="noopener" class="chip">⌖ ${e(ev.location)} ↗</a>`:''}<span class="chip ${ev.status==='confirmed'?'confirmed':'draft'}">${e(statuses[ev.status]||'待确认')}</span></div></div></div>`).join(''):'<div class="empty-state">这一天还没有具体安排</div>'}</div></section>
- <div class="rail"><div class="panel rail-card"><div class="head"><span class="symbol">🏨</span><span class="card-title">当晚住宿</span></div><p class="stay-name">${e(hotelInfo.title)}</p><div class="stay-sub">${day.id===9?'当日没有住宿安排':hotelInfo.source?'从酒店预订自动关联 · '+e(hotelInfo.source.status==='confirmed'?'已确认':'待确认'):e(day.place)+' · 未关联有效日期的酒店预订'}</div><hr><button type="button" class="hotel-link" data-action="view-stays">查看 / 修改酒店预订 →</button></div></div></div>`}
+ <div class="rail"><div class="panel rail-card"><div class="head"><span class="symbol">🏨</span><span class="card-title">当晚住宿</span></div><p class="stay-name">${e(hotelInfo.title)}</p><div class="stay-sub">${day.place==='返程'?'当日没有住宿安排':hotelInfo.source?'从酒店预订自动关联 · '+e(hotelInfo.source.status==='confirmed'?'已确认':'待确认'):e(day.place)+' · 未关联有效日期的酒店预订'}</div><hr><button type="button" class="hotel-link" data-action="view-stays">查看 / 修改酒店预订 →</button></div></div></div>`}
 function bookingsHTML(){let list=data.bookings.filter(b=>filter==='all'||b.type===filter);let confirmed=data.bookings.filter(b=>b.status==='confirmed').length;return `<div class="stats"><div class="stat"><strong>${data.bookings.length}</strong><span>计划项目</span></div><div class="stat"><strong>${confirmed}</strong><span>已经确认</span></div><div class="stat"><strong>${data.bookings.length-confirmed}</strong><span>尚待确认</span></div></div><div class="subsection-header"><h3>全部预订</h3><button class="mini-add edit-only" data-action="add-booking">＋ 添加预订</button></div><div class="filter-row">${[['all','全部'],['flight','航班'],['stay','酒店'],['car','租车'],['ticket','门票'],['other','其他']].map(([v,n])=>`<button class="filter ${v===filter?'active':''}" data-filter="${v}">${n}</button>`).join('')}</div><div class="booking-list">${list.length?list.map(b=>`<div class="booking panel"><div class="booking-top"><span class="booking-type">${e(types[b.type]||'其他')}</span><span class="chip ${b.status==='confirmed'?'confirmed':'draft'}">${e(statuses[b.status]||'待确认')}</span></div><h3 class="booking-title">${e(b.title)}</h3><div class="booking-date">📅 ${e(b.dates)}</div><div class="booking-details">${e(b.details)}${b.reference?'<br>参考编号：'+e(b.reference):''}</div><div class="booking-foot"><span class="booking-persons">${e(b.people)}</span><button class="small-btn edit-only" data-action="edit-booking" data-id="${e(b.id)}">编辑信息</button></div></div>`).join(''):'<div class="empty-panel">该类别暂时没有预订记录</div>'}</div>`}
 
 const JP_PLACE_HINTS=[
@@ -740,7 +751,7 @@ function closeModal(){element('modalRoot').innerHTML=''}
 function field(name,label,value='',tag='input',other=''){const v=e(value);return `<div class="field"><label for="field-${name}">${label}</label>${tag==='textarea'?`<textarea id="field-${name}" name="${name}" ${other}>${v}</textarea>`:`<input id="field-${name}" name="${name}" value="${v}" ${other}>`}</div>`}
 function optionSelect(name,label,opts,value){return `<div class="field"><label for="field-${name}">${label}</label><select name="${name}" id="field-${name}">${opts.map(([v,l])=>`<option value="${e(v)}" ${v===value?'selected':''}>${e(l)}</option>`).join('')}</select></div>`}
 function modalHeader(title){return `<div class="modal-head"><h2>${e(title)}</h2><button class="close-modal" type="button" data-action="close" aria-label="关闭">×</button></div>`}
-function beginEdit(){edit=!edit;toast(edit?(cloud?'已进入自由编辑 · 保存后全家同步':'已进入自由编辑 · 当前仅保存本设备'):'已完成编辑');render()}
+function beginEdit(){if(data.days?.length===9){toast('请先点击「应用新版行程」更新到2月10日返程');return;}edit=!edit;toast(edit?(cloud?'已进入自由编辑 · 保存后全家同步':'已进入自由编辑 · 当前仅保存本设备'):'已完成编辑');render()}
 function editMapNotesForm(){
   modal(`${modalHeader('编辑旅行地图备注')}<p class="micro">修改后会保存到云端；地图位置与导航路线不会受影响。</p><form id="mapNotesForm">${field('mapIntro','地图上方路线说明',mapNote('intro'),'textarea','maxlength="1200"')}${places.map((p,i)=>field('stop'+i,p.name+' · 地点备注',mapStopNote(i),'textarea','maxlength="300"')).join('')}<div class="modal-actions"><button type="button" class="secondary" data-action="close">取消</button><button type="submit" class="primary">保存地图备注</button></div></form>`);
  }
@@ -751,13 +762,26 @@ function bookingForm(id){
   let b=data.bookings.find(b=>b.id===id)||{type:'stay',title:'',dates:'',people:'',details:'',status:'pending',location:'',reference:''};
   const dates=parseStayDates(b),checkIn=b.checkIn||(dates?`2027-02-${String(dates[0]).padStart(2,'0')}`:''),
     checkOut=b.checkOut||(dates?`2027-02-${String(dates[1]).padStart(2,'0')}`:'');
-  const stayFields=`<div id="stayDateFields" class="field-grid ${b.type==='stay'?'':'hidden-fields'}">${field('checkIn','入住日期',checkIn,'input','type="date" min="2027-02-03" max="2027-02-11"')}${field('checkOut','退房日期',checkOut,'input','type="date" min="2027-02-04" max="2027-02-12"')}</div>`;
+  const stayFields=`<div id="stayDateFields" class="field-grid ${b.type==='stay'?'':'hidden-fields'}">${field('checkIn','入住日期',checkIn,'input','type="date" min="2027-02-03" max="2027-02-10"')}${field('checkOut','退房日期',checkOut,'input','type="date" min="2027-02-04" max="2027-02-11"')}</div>`;
   modal(`${modalHeader(id?'修改预订信息':'新增预订')}<form id="bookingForm" data-id="${e(id||'')}"><div class="field-grid">${optionSelect('type','预订类型',Object.entries(types).map(([v,l])=>[v,l]),b.type)}${optionSelect('status','确认状态',Object.entries(statuses).map(([v,l])=>[v,l]),b.status)}</div>${field('title','标题 / 酒店名称',b.title,'input','required maxlength="160"')}${stayFields}<div class="field-grid">${field('dates','日期文字说明（非酒店类型可自由填写）',b.dates,'input','maxlength="120"')}${field('people','涉及成员',b.people,'input','maxlength="100"')}</div>${field('details','航班号 / 住宿信息 / 预订备注',b.details,'textarea','maxlength="600"')}${field('location','目的地 / 位置',b.location,'input','maxlength="140"')}${field('reference','参考编号（不建议填写敏感凭证）',b.reference,'input','maxlength="100"')}<p class="micro">酒店需要填写入住、退房日期，才会自动显示在每天的「当晚住宿」卡片。原有预订也可以补填。</p><div class="modal-actions">${id?'<button class="danger-btn" type="button" data-action="delete-booking" data-id="'+e(id)+'">删除</button>':''}<button class="secondary" type="button" data-action="close">取消</button><button class="primary" type="submit">保存预订</button></div></form>`)
 }
 function downloadFile(){const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download='2027春节家庭日本旅行_备份.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);toast('已导出行程备份')}
-async function share(){const url=window.location.href.split('#')[0];const msg='🇯🇵 2027 春节日本关东家庭旅行\n2月3–11日｜东京 · 箱根 · 伊豆 · 富士山 · 迪士尼\n'+url;if(navigator.share&&/^https?:/.test(url)){try{await navigator.share({title:'春节日本家庭旅行',text:'春节关东之行 · 2027家庭旅行',url});return}catch(_){}}try{await navigator.clipboard.writeText(msg);toast('已复制网址，可粘贴到微信')}catch(_){const t=document.createElement('textarea');t.value=msg;document.body.appendChild(t);t.select();try{document.execCommand('copy');toast('已复制分享内容')}catch(_){toast('请复制浏览器地址栏网址')}t.remove()}}
+async function share(){const url=window.location.href.split('#')[0];const msg='🇯🇵 2027 春节日本关东家庭旅行\n2月3–10日｜东京 · 箱根 · 伊豆 · 富士山 · 迪士尼\n'+url;if(navigator.share&&/^https?:/.test(url)){try{await navigator.share({title:'春节日本家庭旅行',text:'春节关东之行 · 2027家庭旅行',url});return}catch(_){}}try{await navigator.clipboard.writeText(msg);toast('已复制网址，可粘贴到微信')}catch(_){const t=document.createElement('textarea');t.value=msg;document.body.appendChild(t);t.select();try{document.execCommand('copy');toast('已复制分享内容')}catch(_){toast('请复制浏览器地址栏网址')}t.remove()}}
 function formData(form){return Object.fromEntries(new FormData(form).entries())}
-document.addEventListener('click',async ev=>{const tabEl=ev.target.closest('[data-tab]');if(tabEl){setTab(tabEl.dataset.tab);return}const dayEl=ev.target.closest('[data-day]');if(dayEl&&dayEl.classList.contains('day-pill')){activeDay=+dayEl.dataset.day;try{localStorage.setItem(selectedDayKey,String(activeDay))}catch(_){}render();return}const f=ev.target.closest('[data-filter]');if(f){filter=f.dataset.filter;render();return}const act=ev.target.closest('[data-action]');if(!act)return;const {action,id,day}=act.dataset;if(action==='close'){closeModal();return}if(action==='toggle-edit'){beginEdit();return}if(action==='cycle-dot'){const d=data.days.find(d=>d.id===+day);const item=d?.events.find(x=>x.id===id);if(!item)return;const current=eventDotColor(item);item.dotColor=DOT_COLORS[(DOT_COLORS.indexOf(current)+1)%DOT_COLORS.length];render();await persist(true);return}if(action==='view-stays'){filter='stay';setTab('bookings');return}if(action==='edit-todo'&&edit){todoEditForm(id);return}if(action==='move-todo'&&edit){if(moveTodo(id,act.dataset.direction==='up'?-1:1)){render();await persist(true)}return}if(action==='move-event'&&edit){if(moveEvent(+day,id,act.dataset.direction==='up'?-1:1)){render();await persist(true)}return}if(action==='edit-map-notes'&&edit){editMapNotesForm();return}if(action==='edit-day'&&edit){editDayForm(+id);return}if(action==='add-event'&&edit){eventForm(+id);return}if(action==='edit-event'&&edit){eventForm(+day,id);return}if(action==='add-booking'&&edit){bookingForm();return}if(action==='edit-booking'&&edit){bookingForm(id);return}if(action==='reload-cloud'){
+document.addEventListener('click',async ev=>{const tabEl=ev.target.closest('[data-tab]');if(tabEl){setTab(tabEl.dataset.tab);return}const dayEl=ev.target.closest('[data-day]');if(dayEl&&dayEl.classList.contains('day-pill')){activeDay=+dayEl.dataset.day;try{localStorage.setItem(selectedDayKey,String(activeDay))}catch(_){}render();return}const f=ev.target.closest('[data-filter]');if(f){filter=f.dataset.filter;render();return}const act=ev.target.closest('[data-action]');if(!act)return;const {action,id,day}=act.dataset;if(action==='close'){closeModal();return}if(action==='upgrade-trip'){
+  if(!cloud){toast('请先连接云端后再更新行程');return}
+  if(dirty){toast('当前设备有尚未保存的修改，请先导出备份并同步');return}
+  if(!confirm('确定将云端行程调整为 2月3–10日，共8天7晚吗？将先备份旧行程；已确认的旧预订不会自动改签。'))return;
+  try{
+    const resp=await timedFetch('/api/trip',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'migrate-feb10-2027',seed:SEED})},20000);
+    const obj=await resp.json().catch(()=>({}));
+    if(!resp.ok||!obj.data||obj.data.days?.length!==8)throw Error(obj.error||'旧行程迁移失败');
+    data=obj.data;syncedSnapshot=clone(obj.data);lastRemoteStamp=obj.updatedAt||obj.data.updatedAt;
+    activeDay=Math.min(activeDay,8);try{localStorage.setItem(selectedDayKey,String(activeDay))}catch(_){}
+    setDirtyState(false);saveLocal();render();toast('✓ 已更新为2月10日返程，云端已同步');
+  }catch(err){toast('更新失败：'+err.message)}
+  return
+}if(action==='toggle-edit'){beginEdit();return}if(action==='cycle-dot'){const d=data.days.find(d=>d.id===+day);const item=d?.events.find(x=>x.id===id);if(!item)return;const current=eventDotColor(item);item.dotColor=DOT_COLORS[(DOT_COLORS.indexOf(current)+1)%DOT_COLORS.length];render();await persist(true);return}if(action==='view-stays'){filter='stay';setTab('bookings');return}if(action==='edit-todo'&&edit){todoEditForm(id);return}if(action==='move-todo'&&edit){if(moveTodo(id,act.dataset.direction==='up'?-1:1)){render();await persist(true)}return}if(action==='move-event'&&edit){if(moveEvent(+day,id,act.dataset.direction==='up'?-1:1)){render();await persist(true)}return}if(action==='edit-map-notes'&&edit){editMapNotesForm();return}if(action==='edit-day'&&edit){editDayForm(+id);return}if(action==='add-event'&&edit){eventForm(+id);return}if(action==='edit-event'&&edit){eventForm(+day,id);return}if(action==='add-booking'&&edit){bookingForm();return}if(action==='edit-booking'&&edit){bookingForm(id);return}if(action==='reload-cloud'){
   if(!cloud){toast('暂时无法连接云端');return}
   if(dirty&&!confirm('当前设备有尚未同步的修改。建议先导出 JSON 备份。确定放弃这些修改并读取最新云端数据吗？'))return;
   try{const res=await timedFetch('/api/trip',{cache:'no-store'},8000);
@@ -768,7 +792,7 @@ document.addEventListener('click',async ev=>{const tabEl=ev.target.closest('[dat
   }catch(err){toast('加载失败：'+err.message)}return;
  }if(action==='export'){downloadFile();return}if(action==='import'&&edit){element('importFile')?.click();return}if(action==='share'){share();return}if(action==='delete-event'&&edit){if(!confirm('确定删除这条行程吗？'))return;const d=data.days.find(d=>d.id===+day);if(!d)return;d.events=d.events.filter(x=>x.id!==id);closeModal();render();await persist();return}if(action==='delete-booking'&&edit){if(!confirm('确定删除这条预订吗？'))return;data.bookings=data.bookings.filter(x=>x.id!==id);closeModal();render();await persist();return}if(action==='remove-todo'&&edit){data.todos=data.todos.filter(t=>t.id!==id);render();await persist();return}});
 document.addEventListener('submit',async ev=>{const f=ev.target;if(!['dayForm','eventForm','bookingForm','todoForm','todoEditForm','mapNotesForm'].includes(f.id))return;ev.preventDefault();const v=formData(f);if(f.id==='bookingForm'&&v.type==='stay'&&Boolean(v.checkIn)!==Boolean(v.checkOut)){toast('酒店必须同时填写入住和退房日期');return;}if(f.id==='bookingForm'&&v.type==='stay'&&v.checkIn&&v.checkOut&&v.checkOut<=v.checkIn){toast('退房日期必须晚于入住日期');return;}if(f.id==='mapNotesForm'){data.mapNotes={...data.mapNotes,intro:v.mapIntro.trim(),stops:places.map((p,i)=>(v['stop'+i]||'').trim())}}if(f.id==='dayForm'){const d=data.days.find(d=>d.id===+f.dataset.id);if(!d)return;d.title=v.title.trim();d.summary=v.summary.trim();d.hotel=v.hotel.trim();d.icon=v.icon.trim()||'📍'}if(f.id==='eventForm'){const d=data.days.find(d=>d.id===+f.dataset.day);if(!d)return;let ex=d.events.find(x=>x.id===f.dataset.event);if(!ex){ex={id:uid()};d.events.push(ex)}Object.assign(ex,{time:v.time.trim(),type:v.type,title:v.title.trim(),note:v.note.trim(),location:v.location.trim(),status:v.status})}if(f.id==='bookingForm'){let b=data.bookings.find(x=>x.id===f.dataset.id);if(!b){b={id:uid()};data.bookings.push(b)}Object.assign(b,{type:v.type,title:v.title.trim(),dates:v.dates.trim(),people:v.people.trim(),details:v.details.trim(),status:v.status,location:v.location.trim(),reference:v.reference.trim()});if(v.type==='stay'){if(v.checkIn&&v.checkOut&&v.checkOut<=v.checkIn){toast('退房日期必须晚于入住日期');return;}b.checkIn=v.checkIn||'';b.checkOut=v.checkOut||'';if(v.checkIn&&v.checkOut)b.dates=v.checkIn.slice(5).replace('-', '/')+' 入住 · '+v.checkOut.slice(5).replace('-', '/')+' 离店';}else{b.checkIn='';b.checkOut='';}}if(f.id==='todoForm'){if(!edit)return;const t=v.todoText.trim();if(!t)return;data.todos.push({id:uid(),text:t,done:false})}if(f.id==='todoEditForm'){if(!edit)return;const t=v.todoText.trim();if(!t){toast('待办事项不能为空');return}const item=data.todos.find(x=>String(x.id)===String(f.dataset.id));if(!item)return;item.text=t}closeModal();render();await persist()});
-document.addEventListener('change',async ev=>{const t=ev.target;if(t.matches('[data-todo]')&&edit){const item=data.todos.find(x=>x.id===t.dataset.todo);if(item){item.done=t.checked;render();await persist()}}if(t.id==='mapDayFilter'){mapDayFilter=t.value;render();return}if(t.id==='field-type'&&t.closest('#bookingForm')){element('stayDateFields')?.classList.toggle('hidden-fields',t.value!=='stay');return}if(t.id==='importFile'&&edit){const file=t.files&&t.files[0];if(!file)return;try{const obj=JSON.parse(await file.text());if(!obj||!Array.isArray(obj.days)||obj.days.length!==9||!Array.isArray(obj.bookings)||!Array.isArray(obj.todos))throw Error('文件结构不正确');if(!confirm('导入会替换当前行程。确定继续？'))return;data=obj;render();await persist()}catch(err){toast('导入失败：'+err.message)}}});
+document.addEventListener('change',async ev=>{const t=ev.target;if(t.matches('[data-todo]')&&edit){const item=data.todos.find(x=>x.id===t.dataset.todo);if(item){item.done=t.checked;render();await persist()}}if(t.id==='mapDayFilter'){mapDayFilter=t.value;render();return}if(t.id==='field-type'&&t.closest('#bookingForm')){element('stayDateFields')?.classList.toggle('hidden-fields',t.value!=='stay');return}if(t.id==='importFile'&&edit){const file=t.files&&t.files[0];if(!file)return;try{const obj=JSON.parse(await file.text());if(!obj||!Array.isArray(obj.days)||obj.days.length!==8||!Array.isArray(obj.bookings)||!Array.isArray(obj.todos))throw Error('文件结构不正确');if(!confirm('导入会替换当前行程。确定继续？'))return;data=obj;render();await persist()}catch(err){toast('导入失败：'+err.message)}}});
 element('editToggle').addEventListener('click',beginEdit);element('shareBtn').addEventListener('click',share);
 // 作为独立 HTML 直接打开时使用本地数据；云端部署后自动从 /api/trip 同步。
 render();checkCloud();setInterval(poll,60000);window.addEventListener('focus',()=>{if(cloud&&!dirty)poll()});
